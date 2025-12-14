@@ -1,0 +1,1819 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 이미지 텍스트 오버레이 편집기</title>
+    <style>
+        /* ... (이전 CSS 스타일은 변경 없이 그대로 유지) ... */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #0f172a; padding: 0; margin: 0; color: #e2e8f0; height: 100vh; overflow: hidden; }
+        .container { width: 100%; height: 100vh; background: #1e293b; display: flex; flex-direction: column; overflow: hidden; }
+        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 20px 24px; flex-shrink: 0; }
+        .header h1 { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+        .header p { font-size: 14px; opacity: 0.9; margin: 0; }
+        .main-content { display: flex; flex: 1; overflow: hidden; }
+        .sidebar-menu { width: 200px; padding: 20px; border-right: 1px solid #334155; background: #0f172a; overflow-y: auto; flex-shrink: 0; }
+        .menu-item { padding: 12px 16px; margin-bottom: 4px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s; color: #94a3b8; }
+        .menu-item:hover { background: #1e293b; color: #e2e8f0; }
+        .menu-item.active { background: #1e293b; color: #6366f1; border-left: 3px solid #6366f1; }
+        .menu-item-icon { font-size: 18px; width: 20px; text-align: center; }
+        .settings-wrapper { display: flex; flex-direction: column; flex: 1; min-width: 0; border-right: 1px solid #334155; }
+        .settings-panel { flex: 1; padding: 24px; overflow-y: auto; background: #1e293b; min-width: 0; }
+        .settings-footer { flex-shrink: 0; background: #1e293b; padding: 16px 24px; border-top: 1px solid #334155; }
+        .preview-area { flex: 2; padding: 24px; position: relative; background: #1e293b; overflow-y: auto; min-width: 0; }
+        .section { margin-bottom: 28px; padding: 20px; background: #1e293b; border-radius: 8px; border: 1px solid #334155; }
+        .section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #f1f5f9; display: flex; align-items: center; gap: 8px; }
+        .section-title::before { content: ''; width: 4px; height: 20px; background: #6366f1; border-radius: 2px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px; color: #cbd5e1; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 12px; border: 1px solid #475569; border-radius: 6px; font-size: 14px; transition: all 0.2s; background: #0f172a; color: #e2e8f0; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+        .form-group textarea { min-height: 80px; resize: vertical; font-family: inherit; }
+        .help-text { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+        .btn-primary { background: #6366f1; color: white; }
+        .btn-primary:hover { background: #4f46e5; }
+        .btn-secondary { background: #475569; color: white; }
+        .btn-secondary:hover { background: #334155; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-group { display: flex; gap: 8px; margin-top: 12px; }
+        .preview-canvas { position: relative; border: 2px dashed #475569; background: #0f172a; min-height: 400px; display: inline-block; border-radius: 8px; transition: all 0.3s; }
+        .preview-canvas.dragover { border-color: #6366f1; background: #1e293b; }
+        .text-overlay { position: absolute; border: 1px dashed #64748b; cursor: move; user-select: none; padding: 4px; transition: border-color 0.2s; }
+        .text-overlay:hover { border-color: #6366f1; }
+        .text-overlay.selected { border: 2px solid #6366f1; background: rgba(99, 102, 241, 0.1); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+        .resize-handle { position: absolute; width: 10px; height: 10px; background: #6366f1; border: 2px solid #1e293b; border-radius: 50%; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .text-overlay.selected .resize-handle { display: block; }
+        .resize-handle.br { bottom: -5px; right: -5px; cursor: nwse-resize; }
+        .element-list { border: 1px solid #334155; border-radius: 6px; max-height: 200px; overflow-y: auto; background: #0f172a; }
+        .element-item { padding: 12px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; cursor: move; transition: background 0.2s; color: #e2e8f0; }
+        .element-item:last-child { border-bottom: none; }
+        .element-item:hover { background: #1e293b; }
+        .element-item.selected { background: rgba(99, 102, 241, 0.15); border-left: 3px solid #6366f1; }
+        .element-item.dragging { opacity: 0.5; background: #334155; }
+        .element-item.drag-over { border-top: 2px solid #6366f1; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .json-output { background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 6px; font-family: 'Monaco', 'Courier New', monospace; font-size: 13px; white-space: pre-wrap; word-wrap: break-word; overflow-x: auto; max-height: 400px; line-height: 1.5; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-content { position: relative; background: #1e293b; margin: 40px auto; padding: 32px; width: 90%; max-width: 900px; border-radius: 12px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.3s; border: 1px solid #334155; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .modal-close { position: absolute; top: 16px; right: 20px; font-size: 32px; cursor: pointer; color: #94a3b8; line-height: 1; transition: color 0.2s; }
+        .modal-close:hover { color: #e2e8f0; }
+        .modal h2 { margin-bottom: 20px; color: #f1f5f9; font-size: 24px; }
+        .modal h3 { margin-top: 24px; margin-bottom: 12px; color: #cbd5e1; font-size: 18px; font-weight: 600; }
+        .example-box { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 16px; margin: 12px 0; font-family: 'Monaco', 'Courier New', monospace; font-size: 13px; white-space: pre-wrap; word-wrap: break-word; line-height: 1.6; color: #e2e8f0; }
+        .tab-buttons { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #334155; }
+        .tab-button { padding: 8px 16px; border: none; background: transparent; cursor: pointer; font-size: 14px; font-weight: 500; color: #94a3b8; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .tab-button.active { color: #6366f1; border-bottom-color: #6366f1; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .font-input-group { display: flex; gap: 8px; align-items: flex-end; }
+        .font-input-group select, .font-input-group input { flex: 1; }
+        .color-input-wrapper { display: flex; gap: 8px; align-items: center; }
+        .color-input-wrapper input[type="color"] { width: 50px; height: 38px; padding: 4px; cursor: pointer; }
+        .color-input-wrapper input[type="text"] { flex: 1; }
+        .empty-state { padding: 20px; text-align: center; color: #64748b; font-size: 14px; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .panel { margin-bottom: 16px; border: 1px solid #334155; border-radius: 6px; background: #0f172a; overflow: hidden; }
+        .panel-header { padding: 12px 16px; background: #1e293b; border-bottom: 1px solid #334155; font-size: 14px; font-weight: 600; color: #cbd5e1; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: background 0.2s; }
+        .panel-header:hover { background: #334155; }
+        .panel-header::before { content: '▼'; font-size: 10px; margin-right: 8px; transition: transform 0.2s; }
+        .panel-header.collapsed::before { transform: rotate(-90deg); }
+        .panel-content { padding: 16px; display: block; }
+        .panel.collapsed .panel-content { display: none; }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>대화창 편집기</h1>
+            <p>대화창 스타일을 디자인하고 JSON 설정을 생성하세요</p>
+        </div>
+        
+        <div class="main-content">
+            <!-- 왼쪽 메뉴 -->
+            <div class="sidebar-menu">
+                <div class="menu-item active" onclick="switchSection('basic', event)">
+                    <span class="menu-item-icon">⚙️</span>
+                    <span>기본 설정</span>
+                </div>
+                <div class="menu-item" onclick="switchSection('font', event)">
+                    <span class="menu-item-icon">📄</span>
+                    <span>폰트 설정</span>
+                </div>
+                <div class="menu-item" onclick="switchSection('text', event)">
+                    <span class="menu-item-icon">📝</span>
+                    <span>텍스트 설정</span>
+                </div>
+                <div class="menu-item" onclick="switchSection('background', event)">
+                    <span class="menu-item-icon">🖼️</span>
+                    <span>배경 설정</span>
+                </div>
+                <div class="menu-item" onclick="switchSection('elements', event)">
+                    <span class="menu-item-icon">📋</span>
+                    <span>요소 관리</span>
+                </div>
+                <div class="menu-item" onclick="switchSection('export', event)">
+                    <span class="menu-item-icon">📤</span>
+                    <span>내보내기</span>
+                </div>
+            </div>
+            
+            <!-- 중앙 설정 패널 -->
+            <div class="settings-wrapper">
+                <div class="settings-panel">
+                    <!-- 기본 설정 섹션 -->
+                <div id="section-basic" class="content-section active">
+                    <div class="section">
+                        <h3 class="section-title">기본 설정</h3>
+                    
+                    <div class="form-group">
+                        <label>베이스 URL</label>
+                        <input type="text" id="baseUrl" placeholder="https://your-worker.domain.com">
+                        <div class="help-text">Worker가 배포된 도메인 주소 (선택사항)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>R2 버킷명</label>
+                        <input type="text" id="bucketName" placeholder="예: my-image-bucket" value="my-bucket">
+                        <div class="help-text">Cloudflare R2 버킷 바인딩 이름</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>프로젝트 경로</label>
+                        <input type="text" id="projectPath" placeholder="예: A/B/C" value="A/B/C">
+                        <div class="help-text">
+                            프로젝트 폴더 경로와 이미지 폴더명을 함께 입력하세요<br>
+                            예: A/B/C → JSON: A/B/C.json, 이미지: A/B/C/img.png<br>
+                            구조: A/ (폴더1) → B/ (폴더2) → C.json, C/ (이미지 폴더), fonts/
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="form-group">
+                            <label>이미지 너비</label>
+                            <input type="number" id="imageWidth" value="800" min="100" max="4000">
+                        </div>
+                        <div class="form-group">
+                            <label>이미지 높이</label>
+                            <input type="number" id="imageHeight" value="600" min="100" max="4000">
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                
+                <!-- 폰트 설정 섹션 -->
+                <div id="section-font" class="content-section">
+                    <div class="section">
+                        <h3 class="section-title">폰트 설정</h3>
+                    
+                    <div class="tab-buttons">
+                        <button class="tab-button active" onclick="switchFontTab('default', event)">기본 폰트</button>
+                        <button class="tab-button" onclick="switchFontTab('web', event)">웹폰트</button>
+                        <button class="tab-button" onclick="switchFontTab('r2', event)">R2 폰트</button>
+                    </div>
+                    
+                    <div id="defaultFontTab" class="tab-content active">
+                        <div class="help-text">
+                            시스템 기본 폰트를 사용합니다. 
+                            텍스트 요소에서 폰트 패밀리를 직접 지정할 수 있습니다.
+                        </div>
+                    </div>
+                    
+                    <div id="webFontTab" class="tab-content">
+                        <div class="form-group">
+                            <label>웹폰트 URL</label>
+                            <input type="text" id="webFontUrl" placeholder="https://fonts.googleapis.com/css2?family=Noto+Sans+KR">
+                            <div class="help-text">Google Fonts 등의 웹폰트 URL</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="addWebFont()">
+                            <span>➕</span> 웹폰트 추가
+                        </button>
+                    </div>
+                    
+                    <div id="r2FontTab" class="tab-content">
+                        <div class="form-group">
+                            <label>R2 폰트 파일명</label>
+                            <input type="text" id="r2FontFilename" placeholder="예: NotoSansKR.ttf">
+                            <div class="help-text">
+                                프로젝트 폴더 내 `fonts/` 폴더에 업로드된 폰트 파일명<br>
+                                지원 형식: .woff2, .woff, .ttf, .otf
+                            </div>
+                        </div>
+                        <!-- ★★★ 개선점 2: 'R2 폰트 사용' 체크박스를 텍스트 요소 설정에서 여기로 이동 -->
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="useR2Font" onchange="updateCurrentElementStyle()">
+                                <strong>선택된 텍스트 요소에 R2 폰트 적용하기</strong>
+                            </label>
+                            <div class="help-text">
+                                위 파일명에 입력된 폰트를 현재 선택된 텍스트 요소에 적용합니다.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label>등록된 폰트</label>
+                        <div id="fontList" class="element-list">
+                            <div class="empty-state">등록된 폰트가 없습니다</div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                
+                <!-- 텍스트 설정 섹션 -->
+                <div id="section-text" class="content-section">
+                    <div class="section">
+                        <h3 class="section-title">텍스트 요소</h3>
+                    
+                    <div class="form-group">
+                        <label>미리보기 텍스트</label>
+                        <textarea id="previewText" placeholder="미리보기에 표시할 텍스트를 입력하세요
+여러 줄 입력 가능합니다" oninput="updateCurrentElementPreview()">샘플 텍스트입니다.
+여러 줄로 작성할 수 있습니다.</textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="form-group">
+                            <label>X 위치</label>
+                            <input type="number" id="textX" value="50" min="0" oninput="updateCurrentElementStyle()">
+                        </div>
+                        <div class="form-group">
+                            <label>Y 위치</label>
+                            <input type="number" id="textY" value="50" min="0" oninput="updateCurrentElementStyle()">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="form-group">
+                            <label>너비</label>
+                            <input type="number" id="textWidth" value="300" min="50" oninput="updateCurrentElementStyle()">
+                        </div>
+                        <div class="form-group">
+                            <label>높이</label>
+                            <input type="number" id="textHeight" value="100" min="30" oninput="updateCurrentElementStyle()">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>폰트 패밀리</label>
+                        <div class="font-input-group">
+                            <select id="fontFamilySelect" onchange="updateFontFamily()">
+                                <option value="sans-serif">고딕체 (Sans-serif)</option>
+                                <option value="serif">명조체 (Serif)</option>
+                                <option value="monospace">고정폭 (Monospace)</option>
+                                <option value="'Noto Sans KR', sans-serif">Noto Sans KR</option>
+                                <option value="'Nanum Gothic', sans-serif">나눔고딕</option>
+                                <option value="'Malgun Gothic', sans-serif">맑은 고딕</option>
+                                <option value="Arial, sans-serif">Arial</option>
+                                <option value="'Times New Roman', serif">Times New Roman</option>
+                                <option value="custom">직접 입력...</option>
+                            </select>
+                            <input type="text" id="fontFamily" value="sans-serif" style="display: none;" 
+                                   placeholder="예: 'CustomFont', sans-serif" oninput="updateCurrentElementStyle()">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="form-group">
+                            <label>폰트 크기 (px)</label>
+                            <input type="number" id="fontSize" value="24" min="8" max="200" oninput="updateCurrentElementStyle()">
+                        </div>
+                        <div class="form-group">
+                            <label>줄 간격</label>
+                            <input type="number" id="lineHeight" value="1.5" min="0.5" max="3" step="0.1" oninput="updateCurrentElementStyle()">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>텍스트 색상</label>
+                        <div class="color-input-wrapper">
+                            <input type="color" id="textColor" value="#000000" oninput="updateCurrentElementStyle()">
+                            <input type="text" id="textColorHex" value="#000000" placeholder="#000000" oninput="updateColorFromHex()">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="form-group">
+                            <label>가로 정렬</label>
+                            <select id="textAlign" onchange="updateCurrentElementStyle()">
+                                <option value="left">왼쪽</option>
+                                <option value="center">가운데</option>
+                                <option value="right">오른쪽</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>세로 정렬</label>
+                            <select id="verticalAlign" onchange="updateCurrentElementStyle()">
+                                <option value="top">위</option>
+                                <option value="middle">중간</option>
+                                <option value="bottom">아래</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>텍스트 줄바꿈</label>
+                        <select id="whiteSpace" onchange="updateCurrentElementStyle()">
+                            <option value="pre-wrap">자동 줄바꿈 (공백 유지)</option>
+                            <option value="normal">자동 줄바꿈</option>
+                            <option value="nowrap">줄바꿈 없음</option>
+                            <option value="pre">입력한 그대로</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>텍스트 테두리 (선택사항)</label>
+                        <div class="row">
+                            <div class="form-group">
+                                <label style="font-weight: normal;">테두리 색상</label>
+                                <input type="color" id="strokeColor" value="#ffffff" oninput="updateCurrentElementStyle()">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-weight: normal;">테두리 두께</label>
+                                <input type="number" id="strokeWidth" value="0" min="0" max="10" oninput="updateCurrentElementStyle()">
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+
+                </div>
+                
+                <!-- 배경 설정 섹션 -->
+                <div id="section-background" class="content-section">
+                    <div class="section">
+                        <h3 class="section-title">배경 요소</h3>
+                    
+                    <div class="form-group">
+                        <label>스타일 프리셋</label>
+                        <select id="stylePreset" onchange="applyPreset(this.value)">
+                            <option value="">프리셋 선택...</option>
+                            <option value="default">기본 대화창</option>
+                            <option value="glass">유리 효과</option>
+                            <option value="vintage">빈티지</option>
+                            <option value="monochrome">흑백</option>
+                            <option value="neon">네온 효과</option>
+                            <option value="minimal">미니멀</option>
+                            <option value="dark">다크 모드</option>
+                            <option value="light">라이트 모드</option>
+                        </select>
+                        <div class="help-text">프리셋을 선택하면 배경 스타일이 자동으로 적용됩니다</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>배경색 (대화창 배경)</label>
+                        <div class="color-input-wrapper">
+                            <input type="color" id="backgroundColor" value="#000000" oninput="updateBackgroundColorFromPicker()">
+                            <input type="text" id="backgroundColorHex" value="#000000" placeholder="#000000" oninput="updateBackgroundColorFromHex()">
+                        </div>
+                        <div class="row" style="margin-top: 8px;">
+                            <div class="form-group">
+                                <label style="font-weight: normal;">투명도 (0-1)</label>
+                                <input type="number" id="backgroundAlpha" value="0.7" min="0" max="1" step="0.01" oninput="updateCurrentElementStyle()">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>텍스트 여백 (Padding)</label>
+                        <div class="row">
+                            <div class="form-group">
+                                <label style="font-weight: normal;">X (좌우)</label>
+                                <input type="number" id="paddingX" value="0" min="0" max="100" oninput="updateCurrentElementStyle()">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-weight: normal;">Y (상하)</label>
+                                <input type="number" id="paddingY" value="0" min="0" max="100" oninput="updateCurrentElementStyle()">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>모서리 둥글기 (Border Radius)</label>
+                        <input type="number" id="borderRadius" value="0" min="0" max="9999999" oninput="updateCurrentElementStyle()">
+                        <div class="help-text">픽셀 단위 (0 = 직각, 값이 클수록 더 둥글게)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>테두리 색상</label>
+                        <div class="color-input-wrapper">
+                            <input type="color" id="borderColor" value="#000000" oninput="updateBorderColorFromPicker()">
+                            <input type="text" id="borderColorHex" value="#000000" placeholder="#000000" oninput="updateBorderColorFromHex()">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>테두리 두께</label>
+                        <input type="number" id="borderWidth" value="0" min="0" max="50" oninput="updateCurrentElementStyle()">
+                        <div class="help-text">픽셀 단위</div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="form-group">
+                            <label>흐림 (Blur)</label>
+                            <input type="number" id="filterBlur" value="0" min="0" max="50" step="0.1" oninput="updateCurrentElementStyle()">
+                            <div class="help-text">픽셀 단위</div>
+                        </div>
+                        <div class="form-group">
+                            <label>밝기 (Brightness)</label>
+                            <input type="number" id="filterBrightness" value="100" min="0" max="200" step="1" oninput="updateCurrentElementStyle()">
+                            <div class="help-text">% 단위</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="form-group">
+                            <label>대비 (Contrast)</label>
+                            <input type="number" id="filterContrast" value="100" min="0" max="200" step="1" oninput="updateCurrentElementStyle()">
+                            <div class="help-text">% 단위</div>
+                        </div>
+                        <div class="form-group">
+                            <label>채도 (Saturate)</label>
+                            <input type="number" id="filterSaturate" value="100" min="0" max="200" step="1" oninput="updateCurrentElementStyle()">
+                            <div class="help-text">% 단위</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>투명도 (Opacity)</label>
+                        <input type="number" id="filterOpacity" value="100" min="0" max="100" step="1" oninput="updateCurrentElementStyle()">
+                        <div class="help-text">% 단위 (배경색 투명도와 별개)</div>
+                    </div>
+                    </div>
+                </div>
+                
+                <!-- 요소 관리 섹션 -->
+                <div id="section-elements" class="content-section">
+                    <div class="section">
+                        <h3 class="section-title">텍스트 요소 목록</h3>
+                        <div id="elementList" class="element-list">
+                            <div class="empty-state">추가된 텍스트 요소가 없습니다</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 내보내기 섹션 -->
+                <div id="section-export" class="content-section">
+                    <div class="section">
+                        <h3 class="section-title">JSON 설정</h3>
+                    <div class="btn-group">
+                        <button class="btn btn-success" onclick="generateJSON()">
+                            <span>👁️</span> 미리보기
+                        </button>
+                        <button class="btn btn-primary" onclick="copyJSON()">
+                            <span>📋</span> 복사
+                        </button>
+                        <button class="btn btn-secondary" onclick="downloadJSON()">
+                            <span>💾</span> 다운로드
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadJSON()">
+                            <span>📂</span> 불러오기
+                        </button>
+                    </div>
+                    <input type="file" id="jsonFile" accept=".json" style="display: none;" onchange="handleJSONLoad(event)">
+                    </div>
+                </div>
+                </div>
+                
+                <!-- 하단 고정 버튼 영역 -->
+                <div class="settings-footer">
+                    <div class="btn-group" style="justify-content: center; margin: 0;">
+                        <button class="btn btn-warning" onclick="updateSelectedElement()">
+                            <span>✏️</span> 선택 요소 수정
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 오른쪽 미리보기 영역 -->
+            <div class="preview-area">
+                <h3 style="margin-bottom: 16px; color: #f1f5f9;">이미지 미리보기</h3>
+                <div class="help-text" style="margin-bottom: 16px;">
+                    이미지를 드래그 앤 드롭하거나 클릭하여 업로드하세요<br>
+                    이미지 비율에 따라 미리보기 크기가 자동으로 조정됩니다
+                </div>
+                
+                <div id="previewCanvas" class="preview-canvas">
+                    <div class="empty-state" style="padding: 60px 40px;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🖼️</div>
+                        <div>배경 이미지를 업로드하거나</div>
+                        <div>기본 캔버스를 생성하세요</div>
+                    </div>
+                </div>
+                
+                <div class="btn-group" style="margin-top: 20px;">
+                    <input type="file" id="bgImage" accept="image/*" style="display: none;">
+                    <button class="btn btn-primary" onclick="document.getElementById('bgImage').click()">
+                        <span>📁</span> 이미지 업로드
+                    </button>
+                    <button class="btn btn-secondary" onclick="createDefaultCanvas()">
+                        <span>🎨</span> 기본 캔버스
+                    </button>
+                    <button class="btn btn-danger" onclick="clearCanvas()">
+                        <span>🗑️</span> 초기화
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JSON 미리보기 모달 -->
+    <div id="jsonModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h2>📄 JSON 미리보기 및 사용 방법</h2>
+            
+            <h3>생성된 JSON</h3>
+            <pre id="jsonOutput" class="json-output"></pre>
+            
+            <!-- ★★★ 개선점 1: 파일 구조 설명을 현재 Worker 로직에 맞게 업데이트 ★★★ -->
+            <h3>파일 구조 (프로젝트 폴더 방식)</h3>
+            <pre class="example-box" id="fileStructure"></pre>
+            
+            <h3>사용 예시</h3>
+            <pre class="example-box" id="usageExample"></pre>
+            
+            <h3>특수문자 처리 가이드</h3>
+            <div class="example-box">• 띄어쓰기 → 밑줄(_) 사용
+  예: Hello_World
+
+• 줄바꿈 → %0A 사용
+  예: 첫번째줄%0A두번째줄
+
+• 실제 사용 예시:
+  ?{파라미터1}=안녕하세요_여러분&{파라미터2}=오늘은%0A좋은_날입니다</div>
+            
+            <div class="btn-group" style="margin-top: 24px;">
+                <button class="btn btn-primary" onclick="copyJSON()">
+                    <span>📋</span> JSON 복사
+                </button>
+                <button class="btn btn-success" onclick="downloadJSON()">
+                    <span>💾</span> JSON 다운로드
+                </button>
+                <button class="btn btn-secondary" onclick="closeModal()">
+                    <span>✖️</span> 닫기
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 플로팅 액션 버튼 (새 요소 추가) -->
+    <button class="btn btn-primary" onclick="showAddElementModal()" 
+            style="position: fixed; bottom: 24px; right: 24px; width: 64px; height: 64px; border-radius: 50%; padding: 0; font-size: 28px; z-index: 1000; box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; transition: all 0.3s;"
+            onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 6px 20px rgba(99, 102, 241, 0.6)';"
+            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 16px rgba(99, 102, 241, 0.4)';"
+            title="새 요소 추가">
+        ➕
+    </button>
+    
+    <!-- 쿼리 파라미터 입력 모달 -->
+    <div id="queryParamModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="modal-close" onclick="closeQueryParamModal()">&times;</span>
+            <h2>새 요소 추가</h2>
+            <div class="form-group">
+                <label>쿼리 파라미터 이름</label>
+                <input type="text" id="queryParamInput" placeholder="예: title, message" 
+                       style="width: 100%; padding: 12px; font-size: 16px;"
+                       onkeypress="if(event.key === 'Enter') confirmAddElement()">
+                <div class="help-text">URL에서 ?title=텍스트 형태로 사용됩니다</div>
+            </div>
+            <div class="btn-group" style="margin-top: 24px; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="closeQueryParamModal()">취소</button>
+                <button class="btn btn-primary" onclick="confirmAddElement()">추가</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 전역 변수
+        let config = {
+            imageSize: {
+                width: 800,
+                height: 600
+            },
+            fonts: [],
+            fontSettings: {
+                mode: 'default'
+            },
+            elements: [],
+            defaultStyle: {
+                fontFamily: 'sans-serif',
+                fontSize: 24,
+                fill: '#000000',
+                textAlign: 'left',
+                verticalAlign: 'top',
+                lineHeight: 1.5,
+                whiteSpace: 'pre-wrap'
+            }
+        };
+        
+        let selectedElementIndex = -1;
+        let isDragging = false;
+        let isResizing = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let elementStartX = 0;
+        let elementStartY = 0;
+        let currentScale = 1;
+        let activeTextElement = null;
+        let draggedIndex = -1;
+        
+        // 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            createDefaultCanvas();
+            updateFontMode();
+        });
+        
+        function setupEventListeners() {
+            // 배경 이미지 업로드
+            document.getElementById('bgImage').addEventListener('change', handleBgImageUpload);
+            
+            // 색상 동기화
+            document.getElementById('textColor').addEventListener('input', function(e) {
+                document.getElementById('textColorHex').value = e.target.value;
+            });
+            
+            const canvas = document.getElementById('previewCanvas');
+            canvas.addEventListener('dragover', (e) => { e.preventDefault(); canvas.classList.add('dragover'); });
+            canvas.addEventListener('dragleave', (e) => { e.preventDefault(); canvas.classList.remove('dragover'); });
+            canvas.addEventListener('drop', (e) => {
+                e.preventDefault();
+                canvas.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].type.startsWith('image/')) {
+                    const fileInput = document.getElementById('bgImage');
+                    fileInput.files = files;
+                    handleBgImageUpload({ target: fileInput });
+                }
+            });
+            canvas.addEventListener('click', (e) => {
+                if (e.target === canvas || (e.target.parentElement === canvas && e.target.classList.contains('empty-state'))) {
+                    document.getElementById('bgImage').click();
+                }
+            });
+            
+            // 전역 마우스 이벤트
+            document.addEventListener('mousemove', handleGlobalMouseMove);
+            document.addEventListener('mouseup', handleGlobalMouseUp);
+            document.getElementById('jsonModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+            document.getElementById('queryParamModal').addEventListener('click', function(e) { if (e.target === this) closeQueryParamModal(); });
+        }
+        
+        function switchSection(sectionName, event) {
+            // 모든 섹션 숨기기
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // 모든 메뉴 아이템 비활성화
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 선택된 섹션 표시
+            const targetSection = document.getElementById(`section-${sectionName}`);
+            if (targetSection) {
+                targetSection.classList.add('active');
+            }
+            
+            // 선택된 메뉴 아이템 활성화
+            if (event) {
+                event.currentTarget.classList.add('active');
+            } else {
+                document.querySelector(`.menu-item[onclick*="${sectionName}"]`).classList.add('active');
+            }
+        }
+        
+        // 프리셋 데이터
+        const stylePresets = {
+            default: {
+                name: '기본 대화창',
+                backgroundColor: '#000000',
+                backgroundAlpha: 0.7,
+                paddingX: 16,
+                paddingY: 12,
+                borderRadius: 8,
+                borderWidth: 0,
+                borderStyle: 'solid',
+                borderColor: '#000000',
+                filterBlur: 0,
+                filterBrightness: 100,
+                filterContrast: 100,
+                filterSaturate: 100,
+                filterOpacity: 100
+            },
+            glass: {
+                name: '유리 효과',
+                backgroundColor: '#ffffff',
+                backgroundAlpha: 0.2,
+                paddingX: 20,
+                paddingY: 16,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderStyle: 'solid',
+                borderColor: '#ffffff',
+                filterBlur: 10,
+                filterBrightness: 100,
+                filterContrast: 100,
+                filterSaturate: 100,
+                filterOpacity: 100
+            },
+            vintage: {
+                name: '빈티지',
+                backgroundColor: '#f4e4c1',
+                backgroundAlpha: 0.9,
+                paddingX: 18,
+                paddingY: 14,
+                borderRadius: 6,
+                borderWidth: 2,
+                borderStyle: 'solid',
+                borderColor: '#8b6914',
+                filterBlur: 0,
+                filterBrightness: 95,
+                filterContrast: 110,
+                filterSaturate: 80,
+                filterOpacity: 100
+            },
+            monochrome: {
+                name: '흑백',
+                backgroundColor: '#ffffff',
+                backgroundAlpha: 0.9,
+                paddingX: 16,
+                paddingY: 12,
+                borderRadius: 0,
+                borderWidth: 2,
+                borderStyle: 'solid',
+                borderColor: '#000000',
+                filterBlur: 0,
+                filterBrightness: 100,
+                filterContrast: 120,
+                filterSaturate: 0,
+                filterOpacity: 100
+            },
+            neon: {
+                name: '네온 효과',
+                backgroundColor: '#000000',
+                backgroundAlpha: 0.8,
+                paddingX: 20,
+                paddingY: 16,
+                borderRadius: 12,
+                borderWidth: 2,
+                borderStyle: 'solid',
+                borderColor: '#00ffff',
+                filterBlur: 0,
+                filterBrightness: 110,
+                filterContrast: 120,
+                filterSaturate: 150,
+                filterOpacity: 100
+            },
+            minimal: {
+                name: '미니멀',
+                backgroundColor: '#ffffff',
+                backgroundAlpha: 0.95,
+                paddingX: 24,
+                paddingY: 20,
+                borderRadius: 4,
+                borderWidth: 1,
+                borderStyle: 'solid',
+                borderColor: '#e5e7eb',
+                filterBlur: 0,
+                filterBrightness: 100,
+                filterContrast: 100,
+                filterSaturate: 100,
+                filterOpacity: 100
+            },
+            dark: {
+                name: '다크 모드',
+                backgroundColor: '#1f2937',
+                backgroundAlpha: 0.95,
+                paddingX: 18,
+                paddingY: 14,
+                borderRadius: 8,
+                borderWidth: 0,
+                borderStyle: 'solid',
+                borderColor: '#374151',
+                filterBlur: 0,
+                filterBrightness: 90,
+                filterContrast: 110,
+                filterSaturate: 100,
+                filterGrayscale: 0,
+                filterSepia: 0,
+                filterOpacity: 100
+            },
+            light: {
+                name: '라이트 모드',
+                backgroundColor: '#ffffff',
+                backgroundAlpha: 0.95,
+                paddingX: 18,
+                paddingY: 14,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderStyle: 'solid',
+                borderColor: '#e5e7eb',
+                filterBlur: 0,
+                filterBrightness: 105,
+                filterContrast: 100,
+                filterSaturate: 100,
+                filterOpacity: 100
+            }
+        };
+        
+        function applyPreset(presetName) {
+            if (!presetName || !stylePresets[presetName]) {
+                return;
+            }
+            
+            const preset = stylePresets[presetName];
+            
+            // 배경색
+            document.getElementById('backgroundColor').value = preset.backgroundColor;
+            document.getElementById('backgroundColorHex').value = preset.backgroundColor;
+            document.getElementById('backgroundAlpha').value = preset.backgroundAlpha;
+            
+            // 패딩
+            document.getElementById('paddingX').value = preset.paddingX;
+            document.getElementById('paddingY').value = preset.paddingY;
+            
+            // 모양
+            document.getElementById('borderRadius').value = preset.borderRadius;
+            
+            // 테두리
+            document.getElementById('borderWidth').value = preset.borderWidth;
+            document.getElementById('borderColor').value = preset.borderColor;
+            document.getElementById('borderColorHex').value = preset.borderColor;
+            
+            // 필터
+            document.getElementById('filterBlur').value = preset.filterBlur;
+            document.getElementById('filterBrightness').value = preset.filterBrightness;
+            document.getElementById('filterContrast').value = preset.filterContrast;
+            document.getElementById('filterSaturate').value = preset.filterSaturate;
+            document.getElementById('filterOpacity').value = preset.filterOpacity;
+            
+            // 선택된 요소가 있으면 적용
+            if (selectedElementIndex >= 0) {
+                updateCurrentElementStyle();
+            }
+            
+            // 프리셋 선택 초기화
+            document.getElementById('stylePreset').value = '';
+            
+            showNotification(`✅ "${preset.name}" 프리셋이 적용되었습니다`, 'success');
+        }
+        
+        function switchFontTab(tab, event) {
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tab + 'FontTab').classList.add('active');
+            config.fontSettings.mode = tab;
+            updateFontMode();
+        }
+        
+        function updateFontMode() {
+            if (config.fontSettings.mode === 'r2') {
+                const filename = document.getElementById('r2FontFilename').value;
+                if (filename) config.fontSettings.r2FontFilename = filename;
+            }
+            updateFontList();
+        }
+        
+        function updateFontFamily() {
+            const select = document.getElementById('fontFamilySelect');
+            const input = document.getElementById('fontFamily');
+            if (select.value === 'custom') {
+                select.style.display = 'none';
+                input.style.display = 'block';
+                input.focus();
+            } else {
+                input.value = select.value;
+                updateCurrentElementStyle();
+            }
+        }
+        
+        function updateColorFromHex() {
+            const hex = document.getElementById('textColorHex').value;
+            if (/^#[0-9A-F]{6}$/i.test(hex)) {
+                document.getElementById('textColor').value = hex;
+                updateCurrentElementStyle();
+            }
+        }
+        
+        function updateBackgroundColorFromPicker() {
+            const color = document.getElementById('backgroundColor').value;
+            document.getElementById('backgroundColorHex').value = color;
+            updateCurrentElementStyle();
+        }
+        
+        function updateBackgroundColorFromHex() {
+            const hex = document.getElementById('backgroundColorHex').value;
+            if (/^#[0-9A-F]{6}$/i.test(hex)) {
+                document.getElementById('backgroundColor').value = hex;
+                updateCurrentElementStyle();
+            }
+        }
+        
+        function togglePanel(header) {
+            const panel = header.parentElement;
+            panel.classList.toggle('collapsed');
+            header.classList.toggle('collapsed');
+        }
+        
+        function updateBorderColorFromPicker() {
+            const color = document.getElementById('borderColor').value;
+            document.getElementById('borderColorHex').value = color;
+            updateCurrentElementStyle();
+        }
+        
+        function updateBorderColorFromHex() {
+            const hex = document.getElementById('borderColorHex').value;
+            if (/^#[0-9A-F]{6}$/i.test(hex)) {
+                document.getElementById('borderColor').value = hex;
+                updateCurrentElementStyle();
+            }
+        }
+        
+        function hexToRgba(hex, alpha) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+        
+        function updateCurrentElementPreview() {
+            if (selectedElementIndex >= 0) updatePreview();
+        }
+        
+        // ★★★ 개선점 3: 드래그 중 실시간 업데이트를 위해 X,Y,너비,높이 업데이트 로직을 통합하고
+        // oninput 이벤트 핸들러를 updateCurrentElementStyle()로 통일
+        function updateCurrentElementStyle() {
+            if (selectedElementIndex >= 0) {
+                const element = config.elements[selectedElementIndex];
+                element.style.x = parseInt(document.getElementById('textX').value) || 0;
+                element.style.y = parseInt(document.getElementById('textY').value) || 0;
+                element.style.width = parseInt(document.getElementById('textWidth').value) || 100;
+                element.style.height = parseInt(document.getElementById('textHeight').value) || 50;
+                element.style.fontFamily = document.getElementById('fontFamily').value;
+                element.style.fontSize = parseInt(document.getElementById('fontSize').value) || 24;
+                element.style.fill = document.getElementById('textColor').value;
+                element.style.textAlign = document.getElementById('textAlign').value;
+                element.style.verticalAlign = document.getElementById('verticalAlign').value;
+                element.style.lineHeight = parseFloat(document.getElementById('lineHeight').value) || 1.5;
+                element.style.whiteSpace = document.getElementById('whiteSpace').value;
+                
+                const strokeWidth = parseInt(document.getElementById('strokeWidth').value) || 0;
+                if (strokeWidth > 0) {
+                    element.style.stroke = document.getElementById('strokeColor').value;
+                    element.style.strokeWidth = strokeWidth;
+                } else {
+                    delete element.style.stroke;
+                    delete element.style.strokeWidth;
+                }
+                
+                element.useR2Font = document.getElementById('useR2Font').checked;
+                
+                // 배경색 처리
+                const bgColor = document.getElementById('backgroundColorHex').value || '#000000';
+                const bgAlpha = parseFloat(document.getElementById('backgroundAlpha').value) || 0;
+                if (bgAlpha > 0) {
+                    // HEX를 RGBA로 변환
+                    const r = parseInt(bgColor.slice(1, 3), 16);
+                    const g = parseInt(bgColor.slice(3, 5), 16);
+                    const b = parseInt(bgColor.slice(5, 7), 16);
+                    element.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${bgAlpha})`;
+                } else {
+                    delete element.style.backgroundColor;
+                }
+                
+                // Padding 처리
+                const paddingX = parseInt(document.getElementById('paddingX').value) || 0;
+                const paddingY = parseInt(document.getElementById('paddingY').value) || 0;
+                if (paddingX > 0 || paddingY > 0) {
+                    element.style.padding = `${paddingY}px ${paddingX}px`;
+                } else {
+                    delete element.style.padding;
+                }
+                
+                // BorderRadius 처리
+                const borderRadius = parseInt(document.getElementById('borderRadius').value) || 0;
+                if (borderRadius > 0) {
+                    element.style.borderRadius = `${borderRadius}px`;
+                } else {
+                    delete element.style.borderRadius;
+                }
+                
+                // 테두리 처리
+                const borderWidth = parseInt(document.getElementById('borderWidth').value) || 0;
+                if (borderWidth > 0) {
+                    element.style.borderWidth = `${borderWidth}px`;
+                    element.style.borderStyle = 'solid';
+                    element.style.borderColor = document.getElementById('borderColorHex').value || '#000000';
+                } else {
+                    delete element.style.borderWidth;
+                    delete element.style.borderStyle;
+                    delete element.style.borderColor;
+                }
+                
+                // 필터 처리
+                const filterBlur = parseFloat(document.getElementById('filterBlur').value) || 0;
+                const filterBrightness = parseInt(document.getElementById('filterBrightness').value) || 100;
+                const filterContrast = parseInt(document.getElementById('filterContrast').value) || 100;
+                const filterSaturate = parseInt(document.getElementById('filterSaturate').value) || 100;
+                const filterOpacity = parseInt(document.getElementById('filterOpacity').value) || 100;
+                
+                const filters = [];
+                if (filterBlur > 0) filters.push(`blur(${filterBlur}px)`);
+                if (filterBrightness !== 100) filters.push(`brightness(${filterBrightness}%)`);
+                if (filterContrast !== 100) filters.push(`contrast(${filterContrast}%)`);
+                if (filterSaturate !== 100) filters.push(`saturate(${filterSaturate}%)`);
+                if (filterOpacity !== 100) filters.push(`opacity(${filterOpacity}%)`);
+                
+                if (filters.length > 0) {
+                    element.style.filter = filters.join(' ');
+                } else {
+                    delete element.style.filter;
+                }
+                
+                updatePreview();
+            }
+        }
+        
+        function addWebFont() {
+            const url = document.getElementById('webFontUrl').value.trim();
+            if (!url) return alert('웹폰트 URL을 입력하세요');
+            if (!config.fonts.includes(url)) {
+                config.fonts.push(url);
+                updateFontList();
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = url;
+                document.head.appendChild(link);
+            }
+            document.getElementById('webFontUrl').value = '';
+        }
+        
+        function updateFontList() {
+            const list = document.getElementById('fontList');
+            const r2Filename = document.getElementById('r2FontFilename').value;
+            let items = [];
+            
+            if (config.fontSettings.mode === 'r2' && r2Filename) {
+                items.push(`<div class="element-item"><span>📁 R2: ${r2Filename}</span></div>`);
+            }
+            
+            config.fonts.forEach((font, index) => {
+                const displayUrl = font.length > 40 ? font.substring(0, 40) + '...' : font;
+                items.push(`<div class="element-item"><span style="font-size: 12px;" title="${font}">🌐 ${displayUrl}</span><button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="removeFont(${index})">삭제</button></div>`);
+            });
+            
+            list.innerHTML = items.length > 0 ? items.join('') : '<div class="empty-state">등록된 폰트가 없습니다</div>';
+        }
+        
+        function removeFont(index) {
+            config.fonts.splice(index, 1);
+            updateFontList();
+        }
+        
+        function handleBgImageUpload(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        config.imageSize.width = img.width;
+                        config.imageSize.height = img.height;
+                        document.getElementById('imageWidth').value = img.width;
+                        document.getElementById('imageHeight').value = img.height;
+                        
+                        const canvas = document.getElementById('previewCanvas');
+                        const maxWidth = canvas.parentElement.offsetWidth - 48;
+                        currentScale = Math.min(1, maxWidth / img.width);
+                        
+                        canvas.style.width = (img.width * currentScale) + 'px';
+                        canvas.style.height = (img.height * currentScale) + 'px';
+                        canvas.style.backgroundImage = `url(${event.target.result})`;
+                        canvas.style.backgroundSize = '100% 100%';
+                        canvas.innerHTML = '';
+                        updatePreview();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        function createDefaultCanvas() {
+            const width = parseInt(document.getElementById('imageWidth').value) || 800;
+            const height = parseInt(document.getElementById('imageHeight').value) || 600;
+            
+            config.imageSize.width = width;
+            config.imageSize.height = height;
+            
+            const canvas = document.getElementById('previewCanvas');
+            const maxWidth = canvas.parentElement.offsetWidth - 48;
+            currentScale = Math.min(1, maxWidth / width);
+            
+            canvas.style.width = (width * currentScale) + 'px';
+            canvas.style.height = (height * currentScale) + 'px';
+            canvas.style.background = 'linear-gradient(45deg, #e5e7eb 25%, transparent 25%, transparent 75%, #e5e7eb 75%, #e5e7eb), linear-gradient(45deg, #e5e7eb 25%, transparent 25%, transparent 75%, #e5e7eb 75%, #e5e7eb)';
+            canvas.style.backgroundSize = '20px 20px';
+            canvas.style.backgroundPosition = '0 0, 10px 10px';
+            canvas.innerHTML = '';
+            updatePreview();
+        }
+        
+        function clearCanvas() {
+            config.elements = [];
+            selectedElementIndex = -1;
+            const canvas = document.getElementById('previewCanvas');
+            canvas.innerHTML = `<div class="empty-state" style="padding: 60px 40px;"><div style="font-size: 48px; margin-bottom: 16px;">🖼️</div><div>배경 이미지를 업로드하거나</div><div>기본 캔버스를 생성하세요</div></div>`;
+            canvas.style.background = 'white';
+            canvas.style.backgroundImage = '';
+            updateElementList();
+        }
+        
+        function showAddElementModal() {
+            document.getElementById('queryParamInput').value = '';
+            document.getElementById('queryParamModal').style.display = 'block';
+            document.getElementById('queryParamInput').focus();
+        }
+        
+        function closeQueryParamModal() {
+            document.getElementById('queryParamModal').style.display = 'none';
+        }
+        
+        function confirmAddElement() {
+            const queryParam = document.getElementById('queryParamInput').value.trim();
+            if (!queryParam) {
+                alert('쿼리 파라미터 이름을 입력하세요');
+                return;
+            }
+            if (config.elements.some(el => el.query === queryParam)) {
+                alert('이미 같은 이름의 쿼리 파라미터가 존재합니다');
+                return;
+            }
+            closeQueryParamModal();
+            addTextElement(queryParam);
+        }
+        
+        function addTextElement(queryParam) {
+            
+            const element = {
+                query: queryParam,
+                style: {
+                    x: parseInt(document.getElementById('textX').value) || 50,
+                    y: parseInt(document.getElementById('textY').value) || 50,
+                    width: parseInt(document.getElementById('textWidth').value) || 300,
+                    height: parseInt(document.getElementById('textHeight').value) || 100,
+                    fontFamily: document.getElementById('fontFamily').value || 'sans-serif',
+                    fontSize: parseInt(document.getElementById('fontSize').value) || 24,
+                    fill: document.getElementById('textColor').value || '#000000',
+                    textAlign: document.getElementById('textAlign').value || 'left',
+                    verticalAlign: document.getElementById('verticalAlign').value || 'top',
+                    lineHeight: parseFloat(document.getElementById('lineHeight').value) || 1.5,
+                    whiteSpace: document.getElementById('whiteSpace').value || 'pre-wrap'
+                }
+            };
+            
+            const strokeWidth = parseInt(document.getElementById('strokeWidth').value) || 0;
+            if (strokeWidth > 0) {
+                element.style.stroke = document.getElementById('strokeColor').value;
+                element.style.strokeWidth = strokeWidth;
+            }
+            
+            element.useR2Font = document.getElementById('useR2Font').checked;
+            
+            // 배경색 기본값 설정
+            const bgColor = document.getElementById('backgroundColorHex').value || '#000000';
+            const bgAlpha = parseFloat(document.getElementById('backgroundAlpha').value) || 0;
+            if (bgAlpha > 0) {
+                const r = parseInt(bgColor.slice(1, 3), 16);
+                const g = parseInt(bgColor.slice(3, 5), 16);
+                const b = parseInt(bgColor.slice(5, 7), 16);
+                element.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${bgAlpha})`;
+            }
+            
+            // Padding 기본값 설정
+            const paddingX = parseInt(document.getElementById('paddingX').value) || 0;
+            const paddingY = parseInt(document.getElementById('paddingY').value) || 0;
+            if (paddingX > 0 || paddingY > 0) {
+                element.style.padding = `${paddingY}px ${paddingX}px`;
+            }
+            
+            // BorderRadius 기본값 설정
+            const borderRadius = parseInt(document.getElementById('borderRadius').value) || 0;
+            if (borderRadius > 0) {
+                element.style.borderRadius = `${borderRadius}px`;
+            }
+            
+            // 테두리 기본값 설정
+            const borderWidth = parseInt(document.getElementById('borderWidth').value) || 0;
+            if (borderWidth > 0) {
+                element.style.borderWidth = `${borderWidth}px`;
+                element.style.borderStyle = 'solid';
+                element.style.borderColor = document.getElementById('borderColorHex').value || '#000000';
+            }
+            
+            // 필터 기본값 설정
+            const filterBlur = parseFloat(document.getElementById('filterBlur').value) || 0;
+            const filterBrightness = parseInt(document.getElementById('filterBrightness').value) || 100;
+            const filterContrast = parseInt(document.getElementById('filterContrast').value) || 100;
+            const filterSaturate = parseInt(document.getElementById('filterSaturate').value) || 100;
+            const filterOpacity = parseInt(document.getElementById('filterOpacity').value) || 100;
+            
+            const filters = [];
+            if (filterBlur > 0) filters.push(`blur(${filterBlur}px)`);
+            if (filterBrightness !== 100) filters.push(`brightness(${filterBrightness}%)`);
+            if (filterContrast !== 100) filters.push(`contrast(${filterContrast}%)`);
+            if (filterSaturate !== 100) filters.push(`saturate(${filterSaturate}%)`);
+            if (filterOpacity !== 100) filters.push(`opacity(${filterOpacity}%)`);
+            
+            if (filters.length > 0) {
+                element.style.filter = filters.join(' ');
+            }
+            
+            config.elements.push(element);
+            selectElement(config.elements.length - 1);
+            showNotification('✅ 텍스트 요소가 추가되었습니다', 'success');
+        }
+        
+        function updateSelectedElement() {
+            if (selectedElementIndex < 0) return alert('수정할 요소를 먼저 선택하세요');
+            updateCurrentElementStyle();
+            updateElementList();
+            showNotification('✏️ 요소가 수정되었습니다', 'warning');
+        }
+        
+        function selectElement(index) {
+            selectedElementIndex = index;
+            const element = config.elements[index];
+            document.getElementById('textX').value = element.style.x;
+            document.getElementById('textY').value = element.style.y;
+            document.getElementById('textWidth').value = element.style.width;
+            document.getElementById('textHeight').value = element.style.height;
+            document.getElementById('fontFamily').value = element.style.fontFamily;
+            
+            const fontSelect = document.getElementById('fontFamilySelect');
+            const fontInput = document.getElementById('fontFamily');
+            const fontOptions = Array.from(fontSelect.options).map(opt => opt.value);
+            if (fontOptions.includes(element.style.fontFamily)) {
+                fontSelect.value = element.style.fontFamily;
+                fontSelect.style.display = 'block';
+                fontInput.style.display = 'none';
+            } else {
+                fontSelect.value = 'custom';
+                fontSelect.style.display = 'none';
+                fontInput.style.display = 'block';
+            }
+            
+            document.getElementById('fontSize').value = element.style.fontSize;
+            document.getElementById('textColor').value = element.style.fill;
+            document.getElementById('textColorHex').value = element.style.fill;
+            document.getElementById('textAlign').value = element.style.textAlign;
+            document.getElementById('verticalAlign').value = element.style.verticalAlign || 'top';
+            document.getElementById('lineHeight').value = element.style.lineHeight || 1.5;
+            document.getElementById('whiteSpace').value = element.style.whiteSpace || 'pre-wrap';
+            document.getElementById('strokeColor').value = element.style.stroke || '#ffffff';
+            document.getElementById('strokeWidth').value = element.style.strokeWidth || 0;
+            document.getElementById('useR2Font').checked = element.useR2Font || false;
+            
+            // 배경색 불러오기
+            if (element.style.backgroundColor) {
+                const rgba = element.style.backgroundColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+                if (rgba) {
+                    const r = parseInt(rgba[1]).toString(16).padStart(2, '0');
+                    const g = parseInt(rgba[2]).toString(16).padStart(2, '0');
+                    const b = parseInt(rgba[3]).toString(16).padStart(2, '0');
+                    const hex = `#${r}${g}${b}`;
+                    document.getElementById('backgroundColor').value = hex;
+                    document.getElementById('backgroundColorHex').value = hex;
+                    document.getElementById('backgroundAlpha').value = rgba[4] || '0.7';
+                }
+            } else {
+                document.getElementById('backgroundColor').value = '#000000';
+                document.getElementById('backgroundColorHex').value = '#000000';
+                document.getElementById('backgroundAlpha').value = '0';
+            }
+            
+            // Padding 불러오기
+            if (element.style.padding) {
+                // padding 형식: "Ypx Xpx" 또는 "top right bottom left"
+                const padding = element.style.padding.match(/(\d+)px/g) || [];
+                if (padding.length === 2) {
+                    // "Ypx Xpx" 형식
+                    document.getElementById('paddingY').value = padding[0] ? parseInt(padding[0]) : 0;
+                    document.getElementById('paddingX').value = padding[1] ? parseInt(padding[1]) : 0;
+                } else if (padding.length === 4) {
+                    // "top right bottom left" 형식 (기존 형식 호환)
+                    document.getElementById('paddingY').value = padding[0] ? parseInt(padding[0]) : 0;
+                    document.getElementById('paddingX').value = padding[1] ? parseInt(padding[1]) : 0;
+                } else {
+                    document.getElementById('paddingY').value = 0;
+                    document.getElementById('paddingX').value = 0;
+                }
+            } else {
+                document.getElementById('paddingY').value = 0;
+                document.getElementById('paddingX').value = 0;
+            }
+            
+            // BorderRadius 불러오기
+            if (element.style.borderRadius) {
+                document.getElementById('borderRadius').value = parseInt(element.style.borderRadius) || 0;
+            } else {
+                document.getElementById('borderRadius').value = 0;
+            }
+            
+            // 테두리 불러오기
+            if (element.style.borderWidth) {
+                document.getElementById('borderWidth').value = parseInt(element.style.borderWidth) || 0;
+                document.getElementById('borderColor').value = element.style.borderColor || '#000000';
+                document.getElementById('borderColorHex').value = element.style.borderColor || '#000000';
+            } else {
+                document.getElementById('borderWidth').value = 0;
+                document.getElementById('borderColor').value = '#000000';
+                document.getElementById('borderColorHex').value = '#000000';
+            }
+            
+            // 필터 불러오기
+            if (element.style.filter) {
+                const filter = element.style.filter;
+                
+                // blur
+                const blurMatch = filter.match(/blur\(([\d.]+)px\)/);
+                document.getElementById('filterBlur').value = blurMatch ? parseFloat(blurMatch[1]) : 0;
+                
+                // brightness
+                const brightnessMatch = filter.match(/brightness\(([\d.]+)%\)/);
+                document.getElementById('filterBrightness').value = brightnessMatch ? parseInt(brightnessMatch[1]) : 100;
+                
+                // contrast
+                const contrastMatch = filter.match(/contrast\(([\d.]+)%\)/);
+                document.getElementById('filterContrast').value = contrastMatch ? parseInt(contrastMatch[1]) : 100;
+                
+                // saturate
+                const saturateMatch = filter.match(/saturate\(([\d.]+)%\)/);
+                document.getElementById('filterSaturate').value = saturateMatch ? parseInt(saturateMatch[1]) : 100;
+                
+                // opacity
+                const opacityMatch = filter.match(/opacity\(([\d.]+)%\)/);
+                document.getElementById('filterOpacity').value = opacityMatch ? parseInt(opacityMatch[1]) : 100;
+            } else {
+                document.getElementById('filterBlur').value = 0;
+                document.getElementById('filterBrightness').value = 100;
+                document.getElementById('filterContrast').value = 100;
+                document.getElementById('filterSaturate').value = 100;
+                document.getElementById('filterOpacity').value = 100;
+            }
+            
+            updateElementList();
+            updatePreview();
+        }
+        
+        function removeElement(index) {
+            if (confirm('이 텍스트 요소를 삭제하시겠습니까?')) {
+                config.elements.splice(index, 1);
+                if (selectedElementIndex === index) selectedElementIndex = -1;
+                else if (selectedElementIndex > index) selectedElementIndex--;
+                updateElementList();
+                updatePreview();
+            }
+        }
+        
+        // 드래그 앤 드롭 핸들러
+        function handleDragStart(e, index) {
+            draggedIndex = index;
+            e.dataTransfer.effectAllowed = 'move';
+            e.currentTarget.classList.add('dragging');
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            
+            const dragging = document.querySelector('.dragging');
+            if (!dragging) return;
+            
+            const afterElement = getDragAfterElement(e.currentTarget.parentElement, e.clientY);
+            
+            if (afterElement == null) {
+                e.currentTarget.parentElement.appendChild(dragging);
+            } else {
+                e.currentTarget.parentElement.insertBefore(dragging, afterElement);
+            }
+        }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            const draggedItem = document.querySelector('.dragging');
+            if (!draggedItem) return;
+            
+            const items = Array.from(e.currentTarget.parentElement.children);
+            const newIndex = items.indexOf(draggedItem);
+            
+            if (draggedIndex !== newIndex && draggedIndex !== -1) {
+                // 배열에서 요소 이동
+                const [movedElement] = config.elements.splice(draggedIndex, 1);
+                config.elements.splice(newIndex, 0, movedElement);
+                
+                // 선택된 인덱스 업데이트
+                if (selectedElementIndex === draggedIndex) {
+                    selectedElementIndex = newIndex;
+                } else if (selectedElementIndex > draggedIndex && selectedElementIndex <= newIndex) {
+                    selectedElementIndex--;
+                } else if (selectedElementIndex < draggedIndex && selectedElementIndex >= newIndex) {
+                    selectedElementIndex++;
+                }
+                
+                updateElementList();
+                updatePreview();
+            }
+            
+            draggedItem.classList.remove('dragging');
+            draggedIndex = -1;
+        }
+        
+        function handleDragEnd(e) {
+            e.currentTarget.classList.remove('dragging');
+            document.querySelectorAll('.element-item').forEach(item => {
+                item.classList.remove('drag-over');
+            });
+            draggedIndex = -1;
+        }
+        
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.element-item:not(.dragging)')];
+            
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+        
+        function updateElementList() {
+            const list = document.getElementById('elementList');
+            if (config.elements.length === 0) {
+                list.innerHTML = '<div class="empty-state">추가된 텍스트 요소가 없습니다</div>';
+            } else {
+                list.innerHTML = config.elements.map((element, index) => `
+                    <div class="element-item ${selectedElementIndex === index ? 'selected' : ''}" 
+                         draggable="true"
+                         onclick="selectElement(${index})"
+                         ondragstart="handleDragStart(event, ${index})"
+                         ondragover="handleDragOver(event)"
+                         ondrop="handleDrop(event)"
+                         ondragend="handleDragEnd(event)">
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <span style="cursor: grab; color: #9ca3af; user-select: none;">⋮⋮</span>
+                            <span><strong>${element.query}</strong><span style="font-size: 12px; color: #6b7280;"> (${element.style.x}, ${element.style.y}) ${element.style.fontSize}px</span></span>
+                        </span>
+                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="event.stopPropagation(); removeElement(${index})">삭제</button>
+                    </div>`).join('');
+            }
+        }
+        
+        function updatePreview() {
+            const canvas = document.getElementById('previewCanvas');
+            if (!canvas.style.backgroundImage && !canvas.style.background) return;
+            canvas.querySelectorAll('.text-overlay').forEach(el => el.remove());
+            config.elements.forEach((element, index) => {
+                // 컨테이너 div (text-overlay)
+                const div = document.createElement('div');
+                div.className = 'text-overlay' + (selectedElementIndex === index ? ' selected' : '');
+                div.style.position = 'absolute';
+                div.style.left = (element.style.x * currentScale) + 'px';
+                div.style.top = (element.style.y * currentScale) + 'px';
+                div.style.width = (element.style.width * currentScale) + 'px';
+                div.style.height = (element.style.height * currentScale) + 'px';
+                
+                // 배경 레이어 생성
+                const backgroundLayer = document.createElement('div');
+                backgroundLayer.style.position = 'absolute';
+                backgroundLayer.style.top = '0';
+                backgroundLayer.style.left = '0';
+                backgroundLayer.style.width = '100%';
+                backgroundLayer.style.height = '100%';
+                
+                // 배경색 적용
+                if (element.style.backgroundColor) {
+                    backgroundLayer.style.backgroundColor = element.style.backgroundColor;
+                }
+                
+                // BorderRadius 적용
+                if (element.style.borderRadius) {
+                    backgroundLayer.style.borderRadius = element.style.borderRadius;
+                    div.style.borderRadius = element.style.borderRadius;
+                }
+                
+                // 테두리 적용
+                if (element.style.borderWidth) {
+                    backgroundLayer.style.borderWidth = element.style.borderWidth;
+                    backgroundLayer.style.borderStyle = 'solid';
+                    backgroundLayer.style.borderColor = element.style.borderColor || '#000000';
+                }
+                
+                // 필터 적용 (배경 레이어에만)
+                if (element.style.filter) {
+                    const filterStr = element.style.filter;
+                    // blur를 backdrop-filter로 분리
+                    const blurMatch = filterStr.match(/blur\(([\d.]+)px\)/);
+                    if (blurMatch) {
+                        // backdrop-filter로 뒷 배경을 흐리게
+                        backgroundLayer.style.backdropFilter = `blur(${blurMatch[1]}px)`;
+                        // blur를 filter에서 제거
+                        const filterWithoutBlur = filterStr.replace(/blur\([\d.]+px\)\s?/, '').trim();
+                        if (filterWithoutBlur) {
+                            backgroundLayer.style.filter = filterWithoutBlur;
+                        }
+                    } else {
+                        backgroundLayer.style.filter = filterStr;
+                    }
+                }
+                
+                // 텍스트 레이어 생성
+                const textContent = document.createElement('div');
+                textContent.style.position = 'relative';
+                textContent.style.zIndex = 1;
+                textContent.style.width = '100%';
+                textContent.style.height = '100%';
+                textContent.style.fontFamily = element.style.fontFamily;
+                textContent.style.fontSize = (element.style.fontSize * currentScale) + 'px';
+                textContent.style.color = element.style.fill;
+                textContent.style.lineHeight = element.style.lineHeight;
+                textContent.style.whiteSpace = element.style.whiteSpace || 'pre-wrap';
+                textContent.style.wordWrap = 'break-word';
+                
+                // Padding 적용 (텍스트 레이어에)
+                if (element.style.padding) {
+                    textContent.style.padding = element.style.padding;
+                }
+                
+                // Flexbox를 사용한 수직 정렬
+                textContent.style.display = 'flex';
+                textContent.style.flexDirection = 'column';
+                
+                // 수직 정렬 (justifyContent는 flex-direction: column일 때 수직 정렬을 제어)
+                if (element.style.verticalAlign === 'middle' || element.style.verticalAlign === 'center') {
+                    textContent.style.justifyContent = 'center';
+                } else if (element.style.verticalAlign === 'bottom') {
+                    textContent.style.justifyContent = 'flex-end';
+                } else {
+                    textContent.style.justifyContent = 'flex-start';
+                }
+                
+                // 텍스트 테두리 (stroke)
+                if (element.style.strokeWidth) {
+                    const sw = element.style.strokeWidth * currentScale;
+                    const sc = element.style.stroke;
+                    textContent.style.textShadow = `-${sw}px -${sw}px 0 ${sc}, ${sw}px -${sw}px 0 ${sc}, -${sw}px ${sw}px 0 ${sc}, ${sw}px ${sw}px 0 ${sc}`;
+                }
+                
+                // 텍스트 내용
+                const textSpan = document.createElement('span');
+                const previewText = document.getElementById('previewText').value || `[${element.query}]`;
+                textSpan.textContent = selectedElementIndex === index ? previewText : `[${element.query}]`;
+                // textSpan의 너비를 100%로 설정하여 패딩 영역 전체를 사용하도록
+                textSpan.style.width = '100%';
+                // textAlign을 textSpan에 직접 적용 (flex container에서는 textAlign이 작동하지 않으므로)
+                textSpan.style.textAlign = element.style.textAlign || 'left';
+                textContent.appendChild(textSpan);
+                
+                // 레이어 조립
+                div.appendChild(backgroundLayer);
+                div.appendChild(textContent);
+                
+                const resizeHandle = document.createElement('div');
+                resizeHandle.className = 'resize-handle br';
+                div.appendChild(resizeHandle);
+                
+                div.dataset.index = index;
+                div.addEventListener('mousedown', handleElementMouseDown);
+                resizeHandle.addEventListener('mousedown', handleResizeMouseDown);
+                
+                canvas.appendChild(div);
+            });
+        }
+        
+        function handleElementMouseDown(e) {
+            if (e.target.classList.contains('resize-handle')) return;
+            e.preventDefault(); e.stopPropagation();
+            
+            const index = parseInt(e.currentTarget.dataset.index);
+            if (selectedElementIndex !== index) selectElement(index);
+            
+            isDragging = true;
+            activeTextElement = e.currentTarget;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            elementStartX = config.elements[index].style.x;
+            elementStartY = config.elements[index].style.y;
+        }
+        
+        function handleResizeMouseDown(e) {
+            e.preventDefault(); e.stopPropagation();
+            const index = parseInt(e.target.parentElement.dataset.index);
+            if (selectedElementIndex !== index) selectElement(index);
+            
+            isResizing = true;
+            activeTextElement = e.target.parentElement;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+        }
+        
+        function handleGlobalMouseMove(e) {
+            if (!isDragging && !isResizing) return;
+            
+            const element = config.elements[selectedElementIndex];
+            if (!element) return;
+
+            if (isDragging) {
+                const deltaX = (e.clientX - dragStartX) / currentScale;
+                const deltaY = (e.clientY - dragStartY) / currentScale;
+                const newX = Math.round(Math.max(0, Math.min(elementStartX + deltaX, config.imageSize.width - element.style.width)));
+                const newY = Math.round(Math.max(0, Math.min(elementStartY + deltaY, config.imageSize.height - element.style.height)));
+                element.style.x = newX;
+                element.style.y = newY;
+                document.getElementById('textX').value = newX;
+                document.getElementById('textY').value = newY;
+            }
+
+            if (isResizing) {
+                const deltaX = (e.clientX - dragStartX) / currentScale;
+                const deltaY = (e.clientY - dragStartY) / currentScale;
+                const newWidth = Math.round(Math.max(50, element.style.width + deltaX));
+                const newHeight = Math.round(Math.max(30, element.style.height + deltaY));
+                element.style.width = newWidth;
+                element.style.height = newHeight;
+                document.getElementById('textWidth').value = newWidth;
+                document.getElementById('textHeight').value = newHeight;
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
+            }
+            
+            // ★★★ 개선점 3: 드래그/리사이즈 중 updatePreview()를 호출하여 실시간으로 반영
+            updatePreview();
+        }
+        
+        function handleGlobalMouseUp(e) {
+            if (isDragging || isResizing) {
+                isDragging = false;
+                isResizing = false;
+                activeTextElement = null;
+                // 마우스를 놓았을 때 마지막으로 한 번 더 업데이트
+                updatePreview();
+            }
+        }
+        
+        function generateJSON() {
+            updateFontMode();
+            config.imageSize.width = parseInt(document.getElementById('imageWidth').value);
+            config.imageSize.height = parseInt(document.getElementById('imageHeight').value);
+            
+            const jsonOutput = JSON.stringify(config, null, 2);
+            document.getElementById('jsonOutput').textContent = jsonOutput;
+            
+            const bucketName = document.getElementById('bucketName').value || 'my-bucket';
+            const projectPath = document.getElementById('projectPath').value || 'A/B/C';
+            
+            // 경로 파싱
+            const pathParts = projectPath.split('/').filter(part => part.trim() !== '');
+            const imageFolderName = pathParts[pathParts.length - 1]; // 마지막 부분이 이미지 폴더명
+            const projectFolder = pathParts.slice(0, -1).join('/'); // 나머지가 프로젝트 폴더
+            
+            // 파일 구조 예시
+            const folderStructure = projectFolder 
+                ? `└── ${projectFolder}/
+    ├── ${imageFolderName}.json  (이 설정 파일)
+    ├── ${imageFolderName}/  (이미지 폴더)
+    │   └── img.png
+    └── fonts/
+        └── ${config.fontSettings.r2FontFilename || '(폰트 파일)'}`
+                : `├── ${imageFolderName}.json  (이 설정 파일)
+├── ${imageFolderName}/  (이미지 폴더)
+│   └── img.png
+└── fonts/
+    └── ${config.fontSettings.r2FontFilename || '(폰트 파일)'}`;
+            
+            document.getElementById('fileStructure').textContent = 
+`R2 버킷: ${bucketName}
+${folderStructure}`;
+
+            const baseUrl = document.getElementById('baseUrl').value || 'https://your-worker.domain.com';
+            const fullImagePath = `${projectPath}/img.png`; // 이미지 경로는 항상 {projectPath}/img.png
+            const queries = config.elements.map((el, index) => `{파라미터${index + 1}}=텍스트_예시`).join('&');
+            
+            // 사용 예시 URL 업데이트
+            document.getElementById('usageExample').textContent = 
+`마크다운 이미지 문법:
+![이미지](${baseUrl}/${bucketName}/${fullImagePath}?${queries})
+
+직접 URL:
+${baseUrl}/${bucketName}/${fullImagePath}?${queries}`;
+            
+            document.getElementById('jsonModal').style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('jsonModal').style.display = 'none';
+        }
+        
+        function copyJSON() {
+            const jsonText = document.getElementById('jsonOutput').textContent;
+            if (!jsonText || jsonText === '') generateJSON();
+            navigator.clipboard.writeText(document.getElementById('jsonOutput').textContent)
+                .then(() => showNotification('📋 JSON이 클립보드에 복사되었습니다', 'success'));
+        }
+        
+        function downloadJSON() {
+            const jsonText = document.getElementById('jsonOutput').textContent || JSON.stringify(config, null, 2);
+            const projectPath = document.getElementById('projectPath').value || 'A/B/C';
+            // 경로에서 마지막 부분(이미지 폴더명)을 파일명으로 사용
+            const pathParts = projectPath.split('/').filter(part => part.trim() !== '');
+            const imageFolderName = pathParts[pathParts.length - 1] || 'config';
+            const blob = new Blob([jsonText], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${imageFolderName}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+        
+        function loadJSON() {
+            document.getElementById('jsonFile').click();
+        }
+        
+        function handleJSONLoad(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        config = JSON.parse(e.target.result);
+                        document.getElementById('imageWidth').value = config.imageSize.width;
+                        document.getElementById('imageHeight').value = config.imageSize.height;
+                        
+                        if (config.fontSettings) {
+                            const mode = config.fontSettings.mode || 'default';
+                            config.fontSettings.mode = mode;
+                            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                            document.querySelector(`.tab-button[onclick*="'${mode}'"]`).classList.add('active');
+                            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                            document.getElementById(mode + 'FontTab').classList.add('active');
+                            if (config.fontSettings.r2FontFilename) {
+                                document.getElementById('r2FontFilename').value = config.fontSettings.r2FontFilename;
+                            }
+                        }
+                        
+                        updateFontList();
+                        updateElementList();
+                        createDefaultCanvas();
+                        updatePreview();
+                        showNotification('✅ JSON 파일을 성공적으로 불러왔습니다', 'success');
+                    } catch (err) {
+                        alert('JSON 파일 파싱 오류: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+            event.target.value = '';
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.textContent = message;
+            const colors = { success: '#10b981', warning: '#f59e0b', error: '#ef4444' };
+            notification.style.cssText = `position: fixed; top: 20px; right: 20px; background: ${colors[type]}; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10000; animation: slideIn 0.3s ease;`;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+        
+        const style = document.createElement('style');
+        style.textContent = `@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }`;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
